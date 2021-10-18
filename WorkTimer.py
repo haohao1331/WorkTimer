@@ -7,8 +7,9 @@ import requests
 
 key = KEY
 token = TOKEN
-checklistId = CHECKLIST_ID
-checkListUrl = f'https://api.trello.com/1/checklists/{checklistId}/checkItems'
+cardId = CARD_ID
+
+cardUrl = f'https://api.trello.com/1/cards/{cardId}/checklists'
 
 # print(checkListUrl)
 # print(key, token, checklistId)
@@ -36,6 +37,8 @@ class Timer:
             return
         self.running = False
         try:
+            checklistId = self.GetMostRecentChecklistId()
+            checklistUrl = f'https://api.trello.com/1/checklists/{checklistId}/checkItems'
             query = {
                 'name': f'{TrelloFormatTime(self.timeText.get())} {self.title.get()}',
                 'pos': 'bottom',
@@ -44,7 +47,7 @@ class Timer:
             }
             response = requests.request(
                 "POST",
-                checkListUrl,
+                checklistUrl,
                 params=query,
                 timeout=timeout
             )
@@ -62,7 +65,7 @@ class Timer:
                 }
                 response = requests.request(
                     "POST",
-                    checkListUrl,
+                    checklistUrl,
                     params=query,
                     timeout=timeout
                 )
@@ -83,6 +86,28 @@ class Timer:
         seconds = FormatedTime(str(int(time.time() - self.startTime) % 60))
         self.timeText.set(hours + ":" + minutes + ":" + seconds)
         self.root.after(1000, self.UpdateTimer)
+    
+    def GetMostRecentChecklistId(self):
+        query = {
+            'key': key,
+            'token': token
+        }
+        response = requests.get(
+            cardUrl,
+            params=query
+        )
+        return min(response.json(), key=lambda x: x['pos'])['id']
+    
+    def Test(self):
+        query = {
+            'key': key,
+            'token': token
+        }
+        response = requests.get(
+            cardUrl,
+            params=query
+        )
+        return min(response.json(), key=lambda x: x['pos'])['id']
 
 
 def FormatedTime(x):
