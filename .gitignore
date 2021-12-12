@@ -4,3 +4,4 @@ setup.py
 build/
 dist/
 env.py
+.eggs/
