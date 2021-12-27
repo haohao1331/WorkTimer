@@ -35,6 +35,10 @@ class TimerSettings:
         }
         with open(self.settingsFilePath, 'w') as s:
             json.dump(settings, s, indent=4)
+        
+        self.lastRecordedDatetime = lrdt
+        self.latestRecordFilePath = settings['latestRecordFilePath']
+        self.lastRecordWorksheetIndex = settings['lastRecordWorksheetIndex']
     
     def FetchSettingsFromJson(self):
         with open(self.settingsFilePath) as s:
@@ -92,6 +96,16 @@ class Timer:
         self.startTime = time.time()
         self.startDatetime = datetime.today()
         self.UpdateTimer()
+    
+    def UpdateTimer(self):
+        if not self.running: 
+            return
+        now = time.time()
+        hours = TwoDigitNumber(str(int(now - self.startTime) // 3600))
+        minutes = TwoDigitNumber(str((int(now - self.startTime) // 60) % 60))
+        seconds = TwoDigitNumber(str(int(now - self.startTime) % 60))
+        self.timeText.set(hours + ":" + minutes + ":" + seconds)
+        self.root.after(1000, self.UpdateTimer)
 
 # ----------------------- Trello option -------------------------------
     def GetMostRecentChecklistId(self):
@@ -149,44 +163,19 @@ class Timer:
         if lrdt:
             if lrdt < GetClosestMonday():
                 self.CreateNewRecordFile()
-            if lrdt and lrdt < datetime.today().date():
+            elif lrdt and lrdt < datetime.today().date():
                 self.CreateNewRecordSheet()
                 
         self.AddRecord()
         messagebox.showinfo("You Are Done!", f"You worked for {self.timeText.get()}!")
-        
-    def UpdateTimer(self):
-        if not self.running: 
-            return
-        now = time.time()
-        hours = TwoDigitNumber(str(int(now - self.startTime) // 3600))
-        minutes = TwoDigitNumber(str((int(now - self.startTime) // 60) % 60))
-        seconds = TwoDigitNumber(str(int(now - self.startTime) % 60))
-        self.timeText.set(hours + ":" + minutes + ":" + seconds)
-        self.root.after(1000, self.UpdateTimer)
     
     def StartUpCheckSaves(self):
         if not os.path.isdir(self.dirPath):
             os.mkdir(self.dirPath)
         if not os.path.isfile(self.settingsFilePath):
             self.CreateNewRecordFile()
-            return
-        
-        # if the setting file already exist
-        self.settings.FetchSettingsFromJson()
-        lastMonday = GetClosestMonday()
-        assert lastMonday.weekday() == 0
-        lrd = self.settings.lastRecordedDatetime.date()
-        today = datetime.today().date()
-        if lrd < lastMonday:   # need a new file to record things
-            self.CreateNewRecordFile()
-        else: # lrd >= lastMonday
-            if lrd < today:
-                self.CreateNewRecordSheet()
-            else:
-                # no need to create worksheet or update settings
-                pass
-            
+        else:   # if the setting file already exist
+            self.settings.FetchSettingsFromJson()
     
     def CreateNewRecordFile(self, date = None):
         date = date if date else datetime.today()
@@ -213,7 +202,6 @@ class Timer:
         newSheet = record.create_sheet(newWorksheetName)
         CreateHeader(newSheet)
         record.save(filename=self.settings.latestRecordFilePath)
-        
         self.settings.UpdateSettings(lastRecordWorksheetIndex=(len(record.sheetnames)-1))
         
     def AddRecord(self):
@@ -248,7 +236,6 @@ def TwoDigitNumber(x):
     
 def TrelloFormatTime(x : str):
     (hours, minutes, seconds) = [int(i) for i in x.split(':')]
-    # print(hours, minutes, seconds)
     minutes += int(seconds >= 30)
     hours = str(hours + minutes // 60)
     minutes = str(minutes % 60)
