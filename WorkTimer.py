@@ -73,6 +73,7 @@ class Timer:
         self.timeText = StringVar()
         self.timer = Label(self.root, textvariable=self.timeText, padx=100, pady=30).grid(row=1, column=0)
         self.stop = Button(self.root, text="I'm Done!", padx=100, pady=10, command=self.StopTimer).grid(row=3)
+        self.root.bind('<Return>', lambda event: self.StopTimer())
         
         # launch
         self.StartUpCheckSaves()
