@@ -1,7 +1,9 @@
 from tkinter import *
 from tkinter import messagebox
+from tkinter import ttk
 from datetime import datetime, timedelta
 from env import *
+from enum import Enum
 import openpyxl as opx
 import time
 import requests
@@ -14,6 +16,23 @@ CARD_URL = f'https://api.trello.com/1/cards/{CARD_ID}/checklists'
 API_TIMEOUT = 5
 SAVE_TO_LOCAL = True
 EYE_REST_NOTIFICATION = True
+
+class Tags(Enum):
+    undefined = (0, 'undefined')
+    bci = (1, 'BCI')
+    maliang = (2, 'Maliang')
+    eat = (3, 'Eat')
+    waste_time = (4, 'Waste time')
+    read = (5, 'Read')
+    entertainment = (6, 'Entertainment')
+    logistics = (7, 'Logistics')
+    sleep = (8, 'Sleep')
+    
+    def __str__(self):
+        return self.value[1]
+    
+    def __int__(self):
+        return self.value[0]
 
 class TimerSettings:
     def __init__(self, settingsFilePath, 
@@ -80,9 +99,25 @@ class Timer:
         self.debugButton = None
         if self.debug:
             self.debugButton = Button(self.root, text="Debug", 
-                           padx=100, pady=10, 
+                           padx=100, pady=10,
                            command=self.Test).grid(row=3)
-        
+        self.checkButtonContainer = Frame(self.root, height=5, width=5)
+        self.checkButtonContainer.grid(row = 4, column=0)
+        self.tagsCheckbuttons = []
+        self.tagsChecked = []
+        r = 0
+        for t in Tags:
+            if t == Tags.undefined: # TODO: bad organization, fix
+                self.tagsChecked.append(None)
+                self.tagsCheckbuttons.append(None)
+                continue
+            self.tagsChecked.append(IntVar())
+            self.tagsCheckbuttons.append(
+                Checkbutton(self.checkButtonContainer, variable=self.tagsChecked[-1], 
+                            onvalue=1, offvalue=0, text=str(t))
+            )
+            self.tagsCheckbuttons[-1].grid(row=r, column=0, sticky = W)
+            r += 1 
         
         # launch
         self.StartUpCheckSaves()
@@ -106,6 +141,8 @@ class Timer:
         self.running = True
         self.startTime = time.time()
         self.startDatetime = datetime.today()
+        for bt in self.tagsCheckbuttons[1:]:
+            bt.deselect()
         self.UpdateTimer()
     
     def UpdateTimer(self):
@@ -219,14 +256,21 @@ class Timer:
         recordFile = opx.load_workbook(self.settings.latestRecordFilePath)
         recordFile.active = self.settings.lastRecordWorksheetIndex
         currentSheet = recordFile.active
-        # ['Start time', 'End time', 'Duration', 'Description', 'Tags', 'Tag-int']
-        record = [GetStoreDatetimeString(self.startDatetime), GetStoreDatetimeString(self.endDatetime), TrelloFormatTime(self.timeText.get()), 
-                  self.title.get(), '', ''] # TODO: tags and tag-int
+        tagsChecked = [t for t in Tags if t != Tags.undefined and self.tagsChecked[int(t)].get() == 1]
+        if len(tagsChecked) == 0:
+            tagsChecked.append(Tags.undefined)
+
+        record = [GetStoreDatetimeString(self.startDatetime),   # start time
+                  GetStoreDatetimeString(self.endDatetime),     # end time
+                  TrelloFormatTime(self.timeText.get()),        # duration
+                  self.title.get(),                             # description
+                  ','.join([str(t) for t in tagsChecked]),      # tags
+                  ','.join([str(int(t)) for t in tagsChecked])] # tag-int
         currentSheet.append(record)
         recordFile.save(filename=self.settings.latestRecordFilePath)
         
         self.settings.UpdateSettings(lastRecordedDatetime=datetime.today())
-        
+
     def Test(self):
         SendNotification('message of not', 'title')
 
