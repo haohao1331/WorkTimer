@@ -7,11 +7,13 @@ import time
 import requests
 import os
 import json
+import platform
 
 CARD_URL = f'https://api.trello.com/1/cards/{CARD_ID}/checklists'
 
 API_TIMEOUT = 5
 SAVE_TO_LOCAL = True
+EYE_REST_NOTIFICATION = True
 
 class TimerSettings:
     def __init__(self, settingsFilePath, 
@@ -52,7 +54,8 @@ class TimerSettings:
         return str(vars(self))
 
 class Timer:
-    def __init__(self):
+    def __init__(self, debug = False):
+        self.debug = debug
         #Saves
         self.dirPath = os.path.expanduser('~/Documents/WorkTimer')
         self.settingsFilePath = os.path.join(self.dirPath, 'settings.json')
@@ -70,10 +73,16 @@ class Timer:
         self.root.title("Work Timer")
         self.title = Entry(self.root)
         self.title.grid(row=0, column=0)
+        self.title.focus()
         self.timeText = StringVar()
         self.timer = Label(self.root, textvariable=self.timeText, padx=100, pady=30).grid(row=1, column=0)
-        self.stop = Button(self.root, text="I'm Done!", padx=100, pady=10, command=self.StopTimer).grid(row=3)
         self.root.bind('<Return>', lambda event: self.StopTimer())
+        self.debugButton = None
+        if self.debug:
+            self.debugButton = Button(self.root, text="Debug", 
+                           padx=100, pady=10, 
+                           command=self.Test).grid(row=3)
+        
         
         # launch
         self.StartUpCheckSaves()
@@ -87,10 +96,11 @@ class Timer:
         self.running = False
         self.endDatetime = datetime.today()
         
-        if SAVE_TO_LOCAL:
-            self.RecordToLocal()
-        else:
-            self.RecordToTrello()
+        if not self.debug:
+            if SAVE_TO_LOCAL:
+                self.RecordToLocal()
+            else:
+                self.RecordToTrello()
         
         self.title.delete(0, 'end')
         self.running = True
@@ -218,15 +228,7 @@ class Timer:
         self.settings.UpdateSettings(lastRecordedDatetime=datetime.today())
         
     def Test(self):
-        query = {
-            'key': KEY,
-            'token': TOKEN
-        }
-        response = requests.get(
-            CARD_URL,
-            params=query
-        )
-        return min(response.json(), key=lambda x: x['pos'])['id']
+        SendNotification('message of not', 'title')
 
 
 def TwoDigitNumber(x):
@@ -256,5 +258,23 @@ def GetStoreDatetimeString(t):
 def RetrieveDatetimeFromString(t):
     return datetime.strptime(t, '%Y-%m-%d %H:%M:%S.%f')
 
+def SendNotification(message, title):
+    # TODO: add notification for windows
+    # https://www.pythongasm.com/desktop-notifications-with-python/
+    plt = platform.system()
+    
+    if plt == 'Darwin':
+        print("darwin")
+        command = f'''
+        osascript -e 'display notification "{message}" with title "{title}" sound name "Glass"'
+        '''
+    elif plt == 'Linux':
+        command = f'''
+        notify-send "{title}" "{message}"
+        '''
+    else:
+        return
+    print(command)
+    os.system(command)
 
-timer = Timer()
+timer = Timer(debug = False)
